@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>🍽️ Рекомендации по еде</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    input { margin: 5px; }
+    button { margin: 5px; }
+    table { border-collapse: collapse; margin-top: 15px; }
+    th, td { border: 1px solid #ccc; padding: 6px 10px; }
+    th { background: #f0f0f0; cursor: pointer; }
+    #meta { margin-top: 10px; color: #555; }
+  </style>
+</head>
+<body>
+<h1>🍽️ Рекомендатель по еде</h1>
+
+<div>
+  <label>Макс. калорий:
+    <input id="max_cal" type="number" value="400">
+  </label>
+  <label>Мин. белка:
+    <input id="min_prot" type="number" value="20">
+  </label>
+  <label>Сколько блюд:
+    <input id="top_n" type="number" value="5">
+  </label>
+</div>
+
+<div>
+  <button onclick="presetDiet()">Диета</button>
+  <button onclick="presetMass()">Масса</button>
+  <button onclick="presetSnack()">Быстрый перекус</button>
+  <button onclick="loadRecs()">Показать рекомендации</button>
+</div>
+
+<div>
+  <label>Поиск по названию:
+    <input id="search" type="text" oninput="applySearch()">
+  </label>
+</div>
+
+<div id="meta"></div>
+<div id="out"></div>
+
+<script>
+let lastData = [];
+
+function presetDiet() {
+  document.getElementById('max_cal').value = 400;
+  document.getElementById('min_prot').value = 20;
+  document.getElementById('top_n').value = 10;
+  loadRecs();
+}
+
+function presetMass() {
+  document.getElementById('max_cal').value = 800;
+  document.getElementById('min_prot').value = 30;
+  document.getElementById('top_n').value = 10;
+  loadRecs();
+}
+
+function presetSnack() {
+  document.getElementById('max_cal').value = 300;
+  document.getElementById('min_prot').value = 10;
+  document.getElementById('top_n').value = 5;
+  loadRecs();
+}
+
+async function loadRecs() {
+  const max_cal = document.getElementById('max_cal').value || 9999;
+  const min_prot = document.getElementById('min_prot').value || 0;
+  const top_n = document.getElementById('top_n').value || 5;
+
+  const url = `/recommend?max_calories=${max_cal}&min_protein=${min_prot}&top_n=${top_n}`;
+  const res = await fetch(url);
+  const data = await res.json();
+
+  if (!data.dishes || data.dishes.length === 0) {
+    document.getElementById('out').innerHTML = '<p>Ничего не найдено.</p>';
+    document.getElementById('meta').innerHTML = '';
+    lastData = [];
+    return;
+  }
+
+  lastData = data.dishes;
+  document.getElementById('meta').innerText =
+    `Найдено ${data.count} блюд. Фильтры: ` +
+    `max_cal=${max_cal}, min_prot=${min_prot}.`;
+
+  renderTable(lastData);
+}
+
+function renderTable(rows) {
+  let html = '<table><tr>' +
+    '<th onclick="sortBy(\'title\')">Блюдо</th>' +
+    '<th onclick="sortBy(\'calories\')">Ккал</th>' +
+    '<th onclick="sortBy(\'protein\')">Белок</th>' +
+    '<th onclick="sortBy(\'fat\')">Жир</th>' +
+    '<th onclick="sortBy(\'sodium\')">Соль</th>' +
+    '<th onclick="sortBy(\'score\')">Счёт</th>' +
+    '</tr>';
+
+  rows.forEach(d => {
+    html += `<tr>
+      <td>${d.title}</td>
+      <td>${d.calories}</td>
+      <td>${d.protein}</td>
+      <td>${d.fat}</td>
+      <td>${d.sodium}</td>
+      <td>${(d.score * 100).toFixed(0)}%</td>
+    </tr>`;
+  });
+
+  html += '</table>';
+  document.getElementById('out').innerHTML = html;
+}
+
+let sortState = { field: 'score', asc: false };
+
+function sortBy(field) {
+  if (sortState.field === field) {
+    sortState.asc = !sortState.asc;
+  } else {
+    sortState.field = field;
+    sortState.asc = field !== 'score'; // score по умолчанию по убыванию
+  }
+  const sorted = [...lastData].sort((a, b) => {
+    const av = a[field];
+    const bv = b[field];
+    if (av < bv) return sortState.asc ? -1 : 1;
+    if (av > bv) return sortState.asc ? 1 : -1;
+    return 0;
+  });
+  renderTable(sorted);
+}
+
+function applySearch() {
+  const q = document.getElementById('search').value.toLowerCase();
+  const filtered = lastData.filter(d => d.title.toLowerCase().includes(q));
+  renderTable(filtered);
+}
+
+// авто-загрузка
+loadRecs();
+</script>
+</body>
+</html>
+
